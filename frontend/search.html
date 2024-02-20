@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
+    <section class="header">
+      <header class="p-3 text-bg-dark">
+        <div class="container">
+          <div
+            class="d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start"
+          >
+            <a
+              href="/"
+              class="d-flex align-items-center mb-2 mb-lg-0 text-white text-decoration-none"
+            >
+              <svg
+                class="bi me-2"
+                width="40"
+                height="32"
+                role="img"
+                aria-label="Bootstrap"
+              >
+                <use xlink:href="#bootstrap"></use>
+              </svg>
+            </a>
+
+            <ul
+              class="nav col-12 col-lg-auto me-lg-auto mb-2 justify-content-center mb-md-0"
+            >
+              <li>
+                <a href="/category" class="nav-link px-2 text-white"
+                  >Category</a
+                >
+              </li>
+              <li>
+                <a href="/product" class="nav-link px-2 text-secondary"
+                  >Product</a
+                >
+              </li>
+            </ul>
+
+            <form class="col-12 col-lg-auto mb-3 mb-lg-0 me-lg-3" role="search">
+              <input
+                id="searchInput"
+                type="search"
+                class="form-control form-control-dark text-bg-dark"
+                placeholder="Search..."
+                aria-label="Search"
+              />
+            </form>
+
+          </div>
+        </div>
+      </header>
+    </section>
+
+    <button class="btn btn-secondary">
+      <a href="javascript:history.back()" class="text-white">Go Back</a>
+    </button>
+
+    <section>
+      <div class="px-4 py-5 my-5 text-center">
+        <div class="col-lg-6 mx-auto">
+          <div class="dropdown">
+            <button
+              class="btn btn-secondary dropdown-toggle"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              All Products
+            </button>
+            <ul id="generateDropDown" class="dropdown-menu"></ul>
+          </div>
+          <br />
+          <section id="generateTable"></section>
+          <div id="paginationContainer" class="pagination"></div>
+        </div>
+        
+      </div>
+    </section>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+   
+
+      fetch("/categoryTable")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+
+          return response.json();
+        })
+        .then((userData) => {
+        
+          let dropDown = `<li><a class="dropdown-item" href="/product">All Products</a></li>`;
+
+          userData.forEach((row, index) => {
+            dropDown += `<li><a class="dropdown-item" href="/productRedirect?category_id=${row.category_id}">${row.category_name}</a></li>`;
+          });
+
+        
+
+          document.getElementById("generateDropDown").innerHTML = dropDown;
+          
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+        });
+
+      var numberOfPages;
+
+      fetch("/numberOfPages")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+
+          return response.json();
+        })
+        .then((userData) => {
+          const rowsPerPage = 5;
+          numberOfPages = Math.floor(userData.length / rowsPerPage);
+         
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+        });
+
+      const queryParams = new URLSearchParams(window.location.search);
+
+     
+      let Value;
+      document.addEventListener("change", function () {
+        Value = document.getElementById("generateDropDown").value;
+       
+        test();
+      });
+
+      const test = () => {
+      
+
+        fetch(`/productRedirect/Data?category_id=${Value}`)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            return response.json(); 
+
+           
+          })
+          .then((userData) => {
+           
+            const queryParams = new URLSearchParams(window.location.search);
+            const page = parseInt(queryParams.get("page")) || 1;
+
+            const baseLink = window.location.href.split("?")[0];
+
+            let rowsPerPage = 5;
+
+            numberOfPages = Math.floor(userData.length / rowsPerPage);
+            if (numberOfPages == 0) {
+              numberOfPages += 1;
+            }
+          
+
+            const tableHtml = productTable(
+              userData,
+              page,
+              numberOfPages,
+              baseLink
+            );
+
+            document.getElementById("generateTable").innerHTML = tableHtml;
+
+            
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
+      };
+      test();
+
+      let debounceTimer;
+    let searchRequestController = new AbortController(); 
+
+     document.getElementById("searchInput").addEventListener("input", function (event) {
+     clearTimeout(debounceTimer);
+
+     let input = event.target.value;
+  
+
+     let html = `
+     <table class="table shadow-lg">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">S.No</th>
+                    <th scope="col">Product ID</th>
+                    <th scope="col">Product Name</th>
+                    <th scope="col">Category Name</th>
+                    <th scope="col">Brand</th>
+                    <th scope="col">MRP</th>
+                    <th scope="col">Discounted Price</th>
+                    <th scope="col">Category Id</th>
+                    <th scope="col">Created Date</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    clearTimeout(debounceTimer);
+    searchRequestController.abort(); 
+
+    debounceTimer = setTimeout(async function () {
+        searchRequestController = new AbortController();
+
+       
+        const response = await fetch(`/product/data?query=${input}`, {
+            signal: searchRequestController.signal // Pass the signal to the fetch request
+        });
+
+        if (input.length > 0) {
+            if (response.ok) {
+                const responseData = await response.json();
+            
+
+                responseData.results.forEach((row, index) => {
+                    html += `
+                        <tr>
+                            <th scope="row">${index + 1}</th>
+                            <td>${row.product_id}</td>
+                            <td>${row.product_name}</td>
+                            <td>${row.category_name}</td>
+                            <td>${row.brand}</td>
+                            <td>${row.mrp}</td>
+                            <td>${row.discounted_price}</td>
+                            <td>${row.category_id}</td>
+                            <td>${new Date(row.created_date).toLocaleDateString("en-GB")}</td>
+                        </tr>
+                    `;
+                });
+
+                document.getElementById("generateTable").innerHTML = html;
+               
+                createPaginationButtons(responseData.totalPages);
+            } else {
+                console.log(`Error While Fetching Data Through Search, ${response.statusText}`);
+            }
+        }
+     }, 500);
+   });
+
+   const paginationContainer = document.getElementById("paginationContainer");
+
+    function createPaginationButtons(totalPages) {
+        let buttonsHtml = "";
+        for (let i = 1; i <= totalPages; i++) {
+          buttonsHtml += `<a href="#" class="page-link" onclick="fetchData(${i})">${i}</a>`;
+        }
+        // generatePaginationLinks(page, numberOfPages, baseLink)
+        paginationContainer.innerHTML = buttonsHtml;
+      }
+
+      async function fetchData(page) {
+      const input = document.getElementById("searchInput").value;
+      const response = await fetch(`/product/data?query=${input}&page=${page}`);
+      if (response.ok) {
+        const responseData = await response.json();
+
+        let html = `<table class="table shadow-lg">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">S.No</th>
+                    <th scope="col">Product ID</th>
+                    <th scope="col">Product Name</th>
+                    <th scope="col">Category Name</th>
+                    <th scope="col">Brand</th>
+                    <th scope="col">MRP</th>
+                    <th scope="col">Discounted Price</th>
+                    <th scope="col">Category Id</th>
+                    <th scope="col">Created Date</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+            responseData.results.forEach((row, index) => {
+              html += `
+                <tr>
+                  <th scope="row">${index + 1}</th>
+                  <td>${row.product_id}</td>
+                  <td>${row.product_name}</td>
+                  <td>${row.category_name}</td>
+                  <td>${row.brand}</td>
+                  <td>${row.mrp}</td>
+                  <td>${row.discounted_price}</td>
+                  <td>${row.category_id}</td>
+                  <td>${new Date(row.created_date).toLocaleDateString("en-GB")}</td>
+                </tr>`;
+            });
+
+            html += `</tbody></table>`;
+
+
+        document.getElementById("generateTable").innerHTML = html;
+      
+
+        createPaginationButtons(responseData.totalPages);
+      } else {
+        console.log(`Error While Fetching Data Through Search, ${response.statusText}`);
+      }
+    }
+
+      function productTable(data, page, numberOfPages, baseLink) {
+       
+
+        let html = `
+                      <h1>${data[0].category_name}</h1>
+                      <table class="table shadow-lg">
+                        <thead class="table-dark">
+                          <tr>
+                            <th scope="col">S.No</th>
+                            <th scope="col">Product ID</th>
+                            <th scope="col">Product Name</th>
+                            <th scope="col">Category Name</th>
+                            <th scope="col">Brand</th>
+                            <th scope="col">MRP</th>
+                            <th scope="col">Discounted Price</th>
+                            <th scope="col">Category Id</th>
+                            <th scope="col">Created Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                    `;
+        data.forEach((row, index) => {
+          html += `
+                        <tr>
+                          <th scope="row">${index + 1}</th>
+                          <td>${row.product_id}</td>
+                          <td>${row.product_name}</td>
+                          <td>${row.category_name}</td>
+                          <td>${row.brand}</td>
+                          <td>${row.mrp}</td>
+                          <td>${row.discounted_price}</td>
+                          <td>${row.category_id}</td>
+                          <td>${new Date(row.created_date).toLocaleDateString(
+                            "en-GB"
+                          )}</td>
+                        </tr>
+                      `;
+        });
+
+        html += `
+                        </tbody>
+                      </table>
+                    `;
+     
+   
+
+        if (numberOfPages >= 1) {
+          html += generatePaginationLinks(page, numberOfPages, baseLink);
+        }
+
+        return html;
+      }
+
+
+      function generatePaginationLinks(page, numberOfPages, baseLink) {
+        let paginationHtml = '<div class="pagination">';
+        if (page > 1) {
+          paginationHtml += `<a href="${baseLink}?page=${
+            page - 1
+          }" class="page-link" onclick="loadProducts(${
+            page - 1
+          })">Previous</a>`;
+        }
+        for (let i = 1; i <= numberOfPages; i++) {
+          paginationHtml += `<a href="${baseLink}?page=${i}" class="page-link" onclick="loadProducts(${i})">${i}</a>`;
+        }
+        if (page < numberOfPages) {
+          paginationHtml += `<a href="${baseLink}?page=${
+            page + 1
+          }" class="page-link" onclick="loadProducts(${page + 1})">Next</a>`;
+        }
+        paginationHtml += "</div>";
+
+       
+        return paginationHtml;
+      }
+    </script>
+  </body>
+</html>
